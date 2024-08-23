@@ -18,9 +18,15 @@ public class NFCTagType4 implements IHCEApplication {
   private static final byte[] C_APDU_SELECT = BinaryUtils.HexStringToByteArray("00A4040007D276000085010100");
   private static final byte[] FILENAME_CC = BinaryUtils.HexStringToByteArray("E103");
   private static final byte[] FILENAME_NDEF = BinaryUtils.HexStringToByteArray("E104");
+  private static final byte[] SELECT_TICKET_USED = BinaryUtils.HexStringToByteArray("00DA00010101"); // Comando para ticket usado
+  private static final byte[] SELECT_TICKET_REJECTED = BinaryUtils.HexStringToByteArray("00DA00010100"); // Comando para ticket rejeitado
   private static final byte[] CC_HEADER = BinaryUtils.HexStringToByteArray("001120FFFFFFFF");
+
   private final PrefManager prefManager;
   private final HceViewModel hceModel;
+
+  private boolean podeGerarTicketNFC = true;
+  private byte[] nfcCardData;
 
   private SelectedFile selectedFile = null;
   public final byte[] ndefDataBuffer = new byte[0xFFFE];
@@ -40,14 +46,9 @@ public class NFCTagType4 implements IHCEApplication {
   }
 
   private void setUpNdefContent() {
-    // Obtém o conteúdo que foi passado do React Native
     String contentHexString = prefManager.getContent();
-
-    // Converte o conteúdo em um array de bytes
-    byte[] ndefContent = BinaryUtils.HexStringToByteArray(contentHexString);
-
-    // Copia o conteúdo para o buffer NDEF
-    System.arraycopy(ndefContent, 0, this.ndefDataBuffer, 0, ndefContent.length);
+    this.nfcCardData = BinaryUtils.HexStringToByteArray(contentHexString); // Atualizando nfcCardData diretamente aqui
+    System.arraycopy(nfcCardData, 0, this.ndefDataBuffer, 0, nfcCardData.length);
   }
 
   private void setUpCapabilityContainerContent() {
@@ -69,11 +70,9 @@ public class NFCTagType4 implements IHCEApplication {
 
   public boolean assertSelectCommand(byte[] command) {
     Boolean result = ApduHelper.commandByRangeEquals(command, 0, 13, C_APDU_SELECT);
-
     if (result) {
       this.hceModel.getLastState().setValue(HceViewModel.HCE_STATE_CONNECTED);
     }
-
     return result;
   }
 
@@ -110,22 +109,19 @@ public class NFCTagType4 implements IHCEApplication {
     System.arraycopy(slicedResponse, 0, response, 0, realLength);
     System.arraycopy(ApduHelper.R_APDU_OK, 0, response, realLength, ApduHelper.R_APDU_OK.length);
 
-    this.hceModel.getLastState()
-      .setValue(HceViewModel.HCE_STATE_READ);
+    this.hceModel.getLastState().setValue(HceViewModel.HCE_STATE_READ);
 
     return response;
   }
 
   private NdefEntity tryHandleSavedTag() {
     NdefEntity nm;
-
     try {
       int nlen = Integer.parseInt(BinaryUtils.ByteArrayToHexString(Arrays.copyOfRange(this.ndefDataBuffer, 0, 2)), 16);
       nm = NdefEntity.fromBytes(Arrays.copyOfRange(this.ndefDataBuffer, 2, 2 + nlen));
     } catch (Exception e) {
       return null;
     }
-
     return nm;
   }
 
@@ -145,13 +141,10 @@ public class NFCTagType4 implements IHCEApplication {
     if (nm != null) {
       this.prefManager.setContent(nm.getContent());
       this.prefManager.setType(nm.getType());
-      this.hceModel.getLastState()
-        .setValue(HceViewModel.HCE_STATE_WRITE_FULL);
-      this.hceModel.getLastState()
-        .setValue(HceViewModel.HCE_STATE_UPDATE_APPLICATION);
+      this.hceModel.getLastState().setValue(HceViewModel.HCE_STATE_WRITE_FULL);
+      this.hceModel.getLastState().setValue(HceViewModel.HCE_STATE_UPDATE_APPLICATION);
     } else {
-      this.hceModel.getLastState()
-        .setValue(HceViewModel.HCE_STATE_WRITE_PARTIAL);
+      this.hceModel.getLastState().setValue(HceViewModel.HCE_STATE_WRITE_PARTIAL);
     }
 
     return ApduHelper.R_APDU_OK;
@@ -186,11 +179,9 @@ public class NFCTagType4 implements IHCEApplication {
 
   private byte[] respondTicketUsed(byte[] command) {
     if (Arrays.equals(command, SELECT_TICKET_USED)) {
-        GlobalResources.podeGerarTicketNFC = false;
-        GlobalResources.nfcCardData = null;
-        GlobalResources.invokeHCETicketUsedEvent(); // Dispara o evento nativo
+        this.podeGerarTicketNFC = false;
+        this.nfcCardData = null;
 
-        // Envia o emit para o React Native
         WritableMap params = Arguments.createMap();
         params.putString("status", "used");
         sendEvent("onTicketUsed", params);
@@ -202,11 +193,9 @@ public class NFCTagType4 implements IHCEApplication {
 
   private byte[] respondTicketRejected(byte[] command) {
     if (Arrays.equals(command, SELECT_TICKET_REJECTED)) {
-        GlobalResources.podeGerarTicketNFC = false;
-        GlobalResources.nfcCardData = null;
-        GlobalResources.invokeHCETicketRejectedEvent(); // Dispara o evento nativo
+        this.podeGerarTicketNFC = false;
+        this.nfcCardData = null;
 
-        // Envia o emit para o React Native
         WritableMap params = Arguments.createMap();
         params.putString("status", "rejected");
         sendEvent("onTicketRejected", params);
@@ -223,7 +212,6 @@ public class NFCTagType4 implements IHCEApplication {
 
   @Override
   public void onDestroy(int reason) {
-    this.hceModel.getLastState()
-      .setValue(HceViewModel.HCE_STATE_DISCONNECTED);
+    this.hceModel.getLastState().setValue(HceViewModel.HCE_STATE_DISCONNECTED);
   }
 }

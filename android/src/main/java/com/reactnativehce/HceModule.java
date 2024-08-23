@@ -44,6 +44,10 @@ public class HceModule extends ReactContextBaseJavaModule {
     }
   }
 
+  public static ReactApplicationContext getReactContext() {
+    return reactContext;
+}
+
   @NonNull
   @Override
   public String getName() {
