@@ -2,6 +2,7 @@ package com.reactnativehce.apps.nfc;
 
 import android.util.Log;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.reactnativehce.HceModule; // Importação necessária para enviar eventos ao React Native
