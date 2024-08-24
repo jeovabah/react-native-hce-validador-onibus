@@ -206,9 +206,15 @@ public class NFCTagType4 implements IHCEApplication {
   }
 
   private void sendEvent(String eventName, WritableMap params) {
-    HceModule.getReactContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
-        .emit(eventName, params);
-  }
+    ReactApplicationContext context = HceModule.getReactContext();
+    if (context != null) {
+        context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+            .emit(eventName, params);
+    } else {
+        Log.w(TAG, "ReactContext is null, cannot send event " + eventName);
+    }
+}
+
 
   @Override
   public void onDestroy(int reason) {
